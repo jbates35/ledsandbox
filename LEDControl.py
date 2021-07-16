@@ -3,8 +3,8 @@ import time
 
 class LEDControl:
     
-    PATTERN_MAX = 3
-    DIM_MAX = 9
+    PATTERN_MAX = 5
+    DIM_MAX = 4
     SPEED_MAX = 2
 
     LED_MAX = 255
@@ -33,11 +33,11 @@ class LEDControl:
         self.pattern = 0
         self.speed = 0
         self.color = 0
-        self.dim = 5
+        self.dim = 0
         self.led = [0, 0, 0]
         self.ledout = (0, 0, 0)
         self.dir = [0, 0, 0]
-        self.speedint = []
+        self.speedint = [0.04, 0.02, 0.01]
         self.colorvals = []
         self.switch_flag = False
         self.changeclr_flag = False
@@ -46,9 +46,11 @@ class LEDControl:
     ############################# RUN SCRIPT ##########################
     def run(self):
         if self.pattern == 0: self.off()
-        elif self.pattern == 1: self.fadeup()
-        elif self.pattern == 2: self.off()
-        elif self.pattern == 3: self.off()
+        elif self.pattern == 1: self.solid()
+        elif self.pattern == 2: self.fade(1) # fade up
+        elif self.pattern == 3: self.fade(0) # fade down
+        elif self.pattern == 4: self.fadex()
+        elif self.pattern == 5: self.breathe()
 
     ############################# LED CONTROL #########################
     def off(self):
@@ -57,13 +59,12 @@ class LEDControl:
             self.ledout = (0, 0, 0)
             self.switch_flag = False
 
-    def fadeup(self):
+    # Fades in one direction only
+    def fade(self, _dir):
         #Initial values
         if self.switch_flag == True:
             self.led = [0, 0, 0]
-            self.dir = [1, 1, 1]
             self.color = 0
-            self.speedint = [0.04, 0.02, 0.01]
             self.colorvals = LEDControl.COLOR_VALS
             self.COLOR_MAX = len(self.colorvals)-1
             self.switch_flag = False
@@ -73,8 +74,70 @@ class LEDControl:
             self.changeclr_flag = False
         #Thread that runs
         for i in range(len(self.led)):
-            self.led[i] = 0 if self.led[i] > LEDControl.LED_MAX else self.led[i] + 1
-        self.ledout = tuple(int(x * y * self.dim / self.DIM_MAX) for x, y in zip(self.led, self.colorvals[self.color]))
+            if _dir == 1:
+                self.led[i] = 0 if self.led[i] >= LEDControl.LED_MAX else self.led[i] + 1
+            else:
+                self.led[i] = LEDControl.LED_MAX if self.led[i] <= 0 else self.led[i] - 1
+        self.ledout = tuple(int(x * y * (self.dim+5) / (self.DIM_MAX+5)) for x, y in zip(self.led, self.colorvals[self.color]))
+        time.sleep(self.speedint[self.speed])
+
+    # Fades in both directions
+    def fadex(self):
+        # Initial values
+        if self.switch_flag == True:
+            self.led = [0, 0, 0]
+            self.color = 0
+            self.dir = [1, 1, 1]
+            self.colorvals = LEDControl.COLOR_VALS
+            self.COLOR_MAX = len(self.colorvals)-1
+            self.switch_flag = False
+        #If color is changed
+        if self.changeclr_flag == True:
+            self.led = [0, 0, 0]
+            self.dir = [1, 1, 1]
+            self.changeclr_flag = False
+        #Thread that runs
+        for i in range(len(self.led)):
+            self.led[i] = self.led[i] + 1 if self.dir[i] == 1 else self.led[i] - 1
+            if self.led[i] == self.LED_MAX:
+                self.dir[i] = 0
+            if self.led[i] == 0:
+                self.dir[i] = 1
+        self.ledout = tuple(int(x * y * (self.dim+5) / (self.DIM_MAX+5)) for x, y in zip(self.led, self.colorvals[self.color]))
+        time.sleep(self.speedint[self.speed])
+
+    def solid(self):
+        # Initial values
+        if self.switch_flag == True:
+            self.led = [255, 255, 255]
+            self.color = 0
+            self.colorvals = LEDControl.COLOR_VALS
+            self.COLOR_MAX = len(self.colorvals)-1
+            self.switch_flag = False
+        #If color is changed
+        if self.changeclr_flag == True:
+            self.changeclr_flag = False
+        self.ledout = tuple(int(x * y * (self.dim+5) / (self.DIM_MAX+5)) for x, y in zip(self.led, self.colorvals[self.color]))
+        time.sleep(0.01)
+
+    def breathe(self):
+        #initial
+        if self.switch_flag == True:
+            self.led = [256, 0, 256]
+            self.color = 0
+            self.COLOR_MAX = 0
+            self.dir = [1, 1, 0]
+            self.switch_flag = False
+        #Thread that runs
+        for i in range(len(self.led)):
+            self.led[i] = self.led[i] + 1 if self.dir[i] == 1 else self.led[i] - 1
+            if self.led[i] >= self.LED_MAX * 3 / 2:
+                self.dir[i] = 0
+            if self.led[i] <= 0:
+                self.dir[i] = 1
+        self.ledouttemp = list(int(x-128) for x in self.led)
+        self.ledouttemp = list(map(lambda x: x if x >= 0 else 0, self.ledouttemp))
+        self.ledout = tuple(int(x * y * (self.dim+5) / (self.DIM_MAX+5)) for x, y in zip(self.ledouttemp, self.colorvals[self.color]))
         time.sleep(self.speedint[self.speed])
 
     ########### CONTROL FUNCTIONS ###########
